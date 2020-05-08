@@ -19,22 +19,24 @@
 
 struct ReturnFromException <: Exception
     func::Function
-    value::Int
+    value::Any
 end
 
 function block(f)
     try
-        println("block")
         f(f)
     catch e
-        f === e.func ? e.value : throw(e)
+        typeof(e) == ReturnFromException && f === e.func ? e.value : throw(e)
     end
 end
 
-function return_form(func, value = nothing)
+function return_from(func, value = nothing)
     throw(ReturnFromException(func,value))
 end
 
+###############################
+############ Tests ############
+###############################
 
 # Tunned example from project spec
 
@@ -47,16 +49,42 @@ end
 #             block() do innerx2
 #                 1 +
 #                 if n == 0
-#                     return_form(inner,11)
+#                     return_from(inner,11)
 #                 elseif n == 1
-#                     return_form(outer,1)
+#                     return_from(outer,1)
 #                 else
-#                     return_form(innerx2,2)
+#                     return_from(innerx2,2)
 #                 end
 #             end
 #         end
 #     end
 # end
+#
+#
+# mystery(n) =
+#     1+
+#     block() do outer
+#         1+
+#         block() do inner
+#             1+
+#             if n == 0
+#                 return_from(inner, 1)
+#             elseif n == 1 return_from(outer, 1)
+#             else
+#                 1
+#             end
+#         end
+#     end
+# end
+#
+# mystery(0)
+# mystery(1)
+# mystery(2)
+
+###############################
+############ Tests ############
+###############################
+
 
 import Base.error
 
@@ -99,3 +127,14 @@ handler_bind(DivisionByZero =>
                         reciprocal(0)
                     end
        end
+
+
+block() do escape
+    handler_bind(DivisionByZero =>
+                    (c)->(println("I saw it too"); return_from(escape, "Done"))) do
+                        handler_bind(DivisionByZero =>
+                                        (c)->println("I saw a division by zero")) do
+                        reciprocal(0)
+                        end
+    end
+end

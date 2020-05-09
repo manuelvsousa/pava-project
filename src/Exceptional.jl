@@ -1,13 +1,13 @@
 # Data structures
 
 #
-# • block(func)
-# • return_from(name, value=nothing)
+# • block(func) DONE
+# • return_from(name, value=nothing) DONE
 # • available_restart(name)
 # • invoke_restart(name, args...)
 # • restart_bind(func, restarts...)
-# • error(exception::Exception)
-# • handler_bind(func, handlers...)
+# • error(exception::Exception) DONE
+# • handler_bind(func, handlers...) DONE
 
 
 # Functions
@@ -103,38 +103,83 @@ struct DivisionByZero <: Exception end
 
 dict = Dict()
 
-function handler_bind(func,args...)
+function handler_bind(func,handlers...)
     try
         func()
     catch e
-        for i in args
-            if  isa(e,i.first)
-                i.second(i)
+        println(handlers)
+        for i in handlers
+            println(i)
+            if isa(e,i.first)
+                if i.second.first == "invoke_restart"
+                    return i.second.second(i)
+                else
+                    i.second(i)
+                end
             end
         end
         rethrow()
     end
 end
+# Testes
+
+# handler_bind(()->reciprocal(0), DivisionByZero =>(c)->println("I saw a division by zero"))
+#
+#
+# handler_bind(DivisionByZero =>
+#             (c)->println("I saw it too")) do
+#                 handler_bind(DivisionByZero =>
+#                     (c)->println("I saw a division by zero")) do
+#                         reciprocal(0)
+#                     end
+#        end
+#
+#
+# block() do escape
+#     handler_bind(DivisionByZero =>
+#                     (c)->(println("I saw it too"); return_from(escape, "Done"))) do
+#                         handler_bind(DivisionByZero =>
+#                                         (c)->println("I saw a division by zero")) do
+#                         reciprocal(0)
+#                         end
+#     end
+# end
+#
 
 
-handler_bind(()->reciprocal(0), DivisionByZero =>(c)->println("I saw a division by zero"))
-
-
-handler_bind(DivisionByZero =>
-            (c)->println("I saw it too")) do
-                handler_bind(DivisionByZero =>
-                    (c)->println("I saw a division by zero")) do
-                        reciprocal(0)
-                    end
-       end
-
-
-block() do escape
-    handler_bind(DivisionByZero =>
-                    (c)->(println("I saw it too"); return_from(escape, "Done"))) do
-                        handler_bind(DivisionByZero =>
-                                        (c)->println("I saw a division by zero")) do
-                        reciprocal(0)
-                        end
-    end
+struct InvokeRestartException <: Exception
+    func::Function
+    value::Any
 end
+
+restart_bindings = Dict()
+
+function restart_bind(func,args...)
+    for i in args
+        restart_bindings[i.first] = i.second
+    end
+    func()
+end
+
+
+function invoke_restart(symbol, args...)
+    println("invoke_restart")
+    "invoke_restart" => restart_bindings[symbol]
+end
+
+reciprocal(value) =
+    restart_bind(:return_zero => ()->0,
+             :return_value => identity,
+             :retry_using => reciprocal) do
+             println(value)
+                value == 0 ? error(DivisionByZero()) : 1/value
+    end
+
+
+handler_bind(DivisionByZero => (c)->invoke_restart(:return_zero)) do
+         reciprocal(0)
+end
+
+invoke_restart(:return_zero).first
+
+reciprocal(0)

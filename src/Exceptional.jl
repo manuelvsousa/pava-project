@@ -107,16 +107,21 @@ function handler_bind(func,handlers...)
     try
         func()
     catch e
-        # println("Handlers")
-        # println(handlers)
+        println("Handlers")
+        println(handlers)
         for i in handlers
+            # handler = i.second(i.second)
             handler = i.second(i.second)
             println(handler)
             if isa(e,i.first)
-                if typeof(handler) <: Pair && handler.first == "invoke_restart"
+                if isa(handler,InvokeRestartStruct)
                     # println("lelelle")
                     # println(handler.second())
-                    return handler.second
+                    if isempty(handler.args)
+                        return handler.func()
+                    else
+                        return handler.func(handler.args...)
+                    end
                 else
                     i.second(i)
                 end
@@ -166,8 +171,17 @@ function restart_bind(func,args...)
 end
 
 
+# This was kep a struct and not a type as imposed limitations described here:
+# https://discourse.julialang.org/t/why-is-it-impossible-to-subtype-a-struct/19876/27
+
+struct InvokeRestartStruct
+    func::Any
+    args::Any
+end
+
 function invoke_restart(symbol, args...)
-    length(args) == 0 ? "invoke_restart" => restart_bindings[symbol]() : "invoke_restart" => restart_bindings[symbol](args...)
+    asd = InvokeRestartStruct(restart_bindings[symbol],args)
+    asd
 end
 
 reciprocal(value) =
@@ -192,5 +206,3 @@ handler_bind(DivisionByZero => (c)->invoke_restart(:retry_using, 10)) do
 end
 
 invoke_restart(:return_zero).first
-
-reciprocal(0)

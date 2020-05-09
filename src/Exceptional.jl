@@ -107,12 +107,16 @@ function handler_bind(func,handlers...)
     try
         func()
     catch e
-        println(handlers)
+        # println("Handlers")
+        # println(handlers)
         for i in handlers
-            println(i)
+            handler = i.second(i.second)
+            println(handler)
             if isa(e,i.first)
-                if i.second.first == "invoke_restart"
-                    return i.second.second(i)
+                if typeof(handler) <: Pair && handler.first == "invoke_restart"
+                    # println("lelelle")
+                    # println(handler.second())
+                    return handler.second
                 else
                     i.second(i)
                 end
@@ -163,8 +167,7 @@ end
 
 
 function invoke_restart(symbol, args...)
-    println("invoke_restart")
-    "invoke_restart" => restart_bindings[symbol]
+    length(args) == 0 ? "invoke_restart" => restart_bindings[symbol]() : "invoke_restart" => restart_bindings[symbol](args...)
 end
 
 reciprocal(value) =
@@ -178,6 +181,14 @@ reciprocal(value) =
 
 handler_bind(DivisionByZero => (c)->invoke_restart(:return_zero)) do
          reciprocal(0)
+end
+
+handler_bind(DivisionByZero => (c)->invoke_restart(:return_value,123)) do
+         reciprocal(0)
+end
+
+handler_bind(DivisionByZero => (c)->invoke_restart(:retry_using, 10)) do
+  reciprocal(0)
 end
 
 invoke_restart(:return_zero).first

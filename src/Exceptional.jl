@@ -26,6 +26,12 @@ function block(f)
     try
         f(f)
     catch e
+        # println(typeof(e) == ReturnFromException)
+        # println(isa(e,ReturnFromException))
+        # if typeof(e) == ReturnFromException
+        #     println("novooooo")
+        #     println(f === e.func)
+        # end
         typeof(e) == ReturnFromException && f === e.func ? e.value : throw(e)
     end
 end
@@ -40,26 +46,26 @@ end
 
 # Tunned example from project spec
 
-# mystery(n) =
-#     1 +
-#     block() do outer
-#         1 +
-#         block() do inner
-#             1 +
-#             block() do innerx2
-#                 1 +
-#                 if n == 0
-#                     return_from(inner,11)
-#                 elseif n == 1
-#                     return_from(outer,1)
-#                 else
-#                     return_from(innerx2,2)
-#                 end
-#             end
-#         end
-#     end
-# end
-#
+mystery(n) =
+    1 +
+    block() do outer
+        1 +
+        block() do inner
+            1 +
+            block() do innerx2
+                1 +
+                if n == 0
+                    return_from(inner,11)
+                elseif n == 1
+                    return_from(outer,1)
+                else
+                    return_from(innerx2,2)
+                end
+            end
+        end
+    end
+end
+
 #
 # mystery(n) =
 #     1+
@@ -76,10 +82,10 @@ end
 #         end
 #     end
 # end
-#
-# mystery(0)
-# mystery(1)
-# mystery(2)
+
+mystery(0)
+mystery(1)
+mystery(2)
 
 ###############################
 ############ Tests ############
@@ -107,49 +113,59 @@ function handler_bind(func,handlers...)
     try
         func()
     catch e
-        println("Handlers")
-        println(handlers)
-        println(e)
+        # println("Handlers")
+        # println(handlers)
+        # println(e)
+        # println("primeiro catch")
+        # println(e)
+        # println(handlers)
         try
             for i in handlers
+                # println("a percorrer handlers")
+                # println(typeof(i))
+                # println(typeof(i.second))
                 # handler = i.second(i.second)
-                handler = i.second(i.second)
-                println("handler")
-                # println(isa(handler,InvokeRestartStruct))
-                # println(isa(e,i.first))
-                # println(dump(i.second(i)))
-                println(i.first)
-                println(e)
+                # handler = i.second(i.second)
+                # println("handler")
+                # # println(isa(handler,InvokeRestartStruct))
+                # # println(isa(e,i.first))
+                # # println(dump(i.second(i)))
+                # println(i.first)
+                # println("Estou aqui 1")
                 if isa(e,i.first)
-                    println("tratar")
-                    if isa(handler,InvokeRestartStruct)
-                        # println("lelelle")
-                        # println(handler.second())
-                        if isempty(handler.args)
-                            return handler.func()
-                        else
-                            return handler.func(handler.args...)
-                        end
-                    else
+                    # println("tratar")
+                    # if isa(handler,InvokeRestartStruct)
+                    #     # println("lelelle")
+                    #     # println(handler.second())
+                    #     if isempty(handler.args)
+                    #         return handler.func()
+                    #     else
+                    #         return handler.func(handler.args...)
+                    #     end
+                    # else
                         i.second(i)
-                    end
+                        rethrow() # TODO cuidado com isto, se calhar nao pode estar dentro do finally
+                        println("Estou aqui 2")
+                    # end
                 end
             end
         catch ee
-            println("catch novo")
+            # println("catch 2")
+            # println("catch novo")
             if isa(ee,InvokeRestartStructEx)
                 # println("lelelle")
                 # println(handler.second())
-                println("dentro da cena nova")
+                # println("dentro da cena nova")
 
                 if isempty(ee.args)
                     return ee.func()
                 else
                     return ee.func(ee.args...)
                 end
+            else
+                rethrow()
             end
         end
-        rethrow() # TODO cuidado com isto, se calhar nao pode estar dentro do finally
     end
 end
 
@@ -178,6 +194,15 @@ block() do escape
     end
 end
 
+block() do escape handler_bind(DivisionByZero =>
+                        (c)->println("I saw it too")) do
+                        handler_bind(DivisionByZero =>
+                            (c)->(println("I saw a division by zero"); return_from(escape, "Done"))) do
+                reciprocal(0)
+           end
+      end
+end
+
 
 restart_bindings = Dict()
 
@@ -204,7 +229,7 @@ struct InvokeRestartStructEx <: Exception
 end
 
 function invoke_restart(symbol, args...)
-    println("inside invoke_restart")
+    # println("inside invoke_restart")
     throw(InvokeRestartStructEx(restart_bindings[symbol],args))
 end
 
@@ -242,14 +267,6 @@ end
 handler_bind(DivisionByZero =>
         (c)-> for restart in (:return_one, :return_zero, :die_horribly)
                 if available_restart(restart)
-                    println("if available_restart true")
-                    println("if available_restart true 2")
-                    println("if available_restart true 3")
-                    if 1 == 1
-                        println("lelelle")
-                    else
-                        println("papapapa")
-                    end
                     invoke_restart(restart)
                 end
             end) do
@@ -257,16 +274,16 @@ handler_bind(DivisionByZero =>
     end
 
 
-reciprocal(value) =
-    handler_bind(DivisionByZero =>
-        (c)-> for restart in (:return_one, :return_zero, :die_horribly)
-                if available_restart(restart)
-                    println("carralho")
-                    invoke_restart(restart)
-                end
-            end) do
-        reciprocal(0)
-    end
+# reciprocal(value) =
+#     handler_bind(DivisionByZero =>
+#         (c)-> for restart in (:return_one, :return_zero, :die_horribly)
+#                 if available_restart(restart)
+#                     println("carralho")
+#                     invoke_restart(restart)
+#                 end
+#             end) do
+#         reciprocal(0)
+#     end
 
 
 reciprocal(0)

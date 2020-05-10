@@ -109,51 +109,75 @@ function handler_bind(func,handlers...)
     catch e
         println("Handlers")
         println(handlers)
-        for i in handlers
-            # handler = i.second(i.second)
-            handler = i.second(i.second)
-            println(handler)
-            if isa(e,i.first)
-                if isa(handler,InvokeRestartStruct)
-                    # println("lelelle")
-                    # println(handler.second())
-                    if isempty(handler.args)
-                        return handler.func()
+        println(e)
+        try
+            for i in handlers
+                # handler = i.second(i.second)
+                handler = i.second(i.second)
+                println("handler")
+                # println(isa(handler,InvokeRestartStruct))
+                # println(isa(e,i.first))
+                # println(dump(i.second(i)))
+                println(i.first)
+                println(e)
+                if isa(e,i.first)
+                    println("tratar")
+                    if isa(handler,InvokeRestartStruct)
+                        # println("lelelle")
+                        # println(handler.second())
+                        if isempty(handler.args)
+                            return handler.func()
+                        else
+                            return handler.func(handler.args...)
+                        end
                     else
-                        return handler.func(handler.args...)
+                        i.second(i)
                     end
+                end
+            end
+        catch ee
+            println("catch novo")
+            if isa(ee,InvokeRestartStructEx)
+                # println("lelelle")
+                # println(handler.second())
+                println("dentro da cena nova")
+
+                if isempty(ee.args)
+                    return ee.func()
                 else
-                    i.second(i)
+                    return ee.func(ee.args...)
                 end
             end
         end
-        rethrow()
+        rethrow() # TODO cuidado com isto, se calhar nao pode estar dentro do finally
     end
 end
+
 # Testes
 
-# handler_bind(()->reciprocal(0), DivisionByZero =>(c)->println("I saw a division by zero"))
-#
-#
-# handler_bind(DivisionByZero =>
-#             (c)->println("I saw it too")) do
-#                 handler_bind(DivisionByZero =>
-#                     (c)->println("I saw a division by zero")) do
-#                         reciprocal(0)
-#                     end
-#        end
-#
-#
-# block() do escape
-#     handler_bind(DivisionByZero =>
-#                     (c)->(println("I saw it too"); return_from(escape, "Done"))) do
-#                         handler_bind(DivisionByZero =>
-#                                         (c)->println("I saw a division by zero")) do
-#                         reciprocal(0)
-#                         end
-#     end
-# end
-#
+handler_bind(()->reciprocal(0), DivisionByZero =>(c)->println("I saw a division by zero"))
+
+
+handler_bind(DivisionByZero =>
+            (c)->println("I saw it too")) do
+                handler_bind(DivisionByZero =>
+                    (c)->println("I saw a division by zero")) do
+                        reciprocal(0)
+                    end
+       end
+
+
+block() do escape
+    handler_bind(DivisionByZero =>
+                    (c)->(println("I saw it too");
+                        return_from(escape, "Done"))) do
+            handler_bind(DivisionByZero =>
+                        (c)->println("I saw a division by zero")) do
+            reciprocal(0)
+        end
+    end
+end
+
 
 restart_bindings = Dict()
 
@@ -173,8 +197,15 @@ struct InvokeRestartStruct
     args::Any
 end
 
+
+struct InvokeRestartStructEx <: Exception
+    func::Any
+    args::Any
+end
+
 function invoke_restart(symbol, args...)
-    InvokeRestartStruct(restart_bindings[symbol],args)
+    println("inside invoke_restart")
+    throw(InvokeRestartStructEx(restart_bindings[symbol],args))
 end
 
 reciprocal(value) =
@@ -186,17 +217,17 @@ reciprocal(value) =
 
 # Testes
 
-# handler_bind(DivisionByZero => (c)->invoke_restart(:return_zero)) do
-#          reciprocal(0)
-# end
+handler_bind(DivisionByZero => (c)->invoke_restart(:return_zero)) do
+         reciprocal(0)
+end
 
-# handler_bind(DivisionByZero => (c)->invoke_restart(:return_value,123)) do
-#          reciprocal(0)
-# end
-#
-# handler_bind(DivisionByZero => (c)->invoke_restart(:retry_using, 10)) do
-#   reciprocal(0)
-# end
+handler_bind(DivisionByZero => (c)->invoke_restart(:return_value,123)) do
+         reciprocal(0)
+end
+
+handler_bind(DivisionByZero => (c)->invoke_restart(:retry_using, 10)) do
+  reciprocal(0)
+end
 
 # invoke_restart(:return_zero).func()
 println(restart_bindings)
@@ -207,13 +238,23 @@ function available_restart(name)
 end
 
 
-for restart in (:return_one, :return_zero, :die_horribly)
-        if available_restart(restart) 
-            println("carralho")
-            println(restart)
-            invoke_restart(restart)
-        end
-end
+
+handler_bind(DivisionByZero =>
+        (c)-> for restart in (:return_one, :return_zero, :die_horribly)
+                if available_restart(restart)
+                    println("if available_restart true")
+                    println("if available_restart true 2")
+                    println("if available_restart true 3")
+                    if 1 == 1
+                        println("lelelle")
+                    else
+                        println("papapapa")
+                    end
+                    invoke_restart(restart)
+                end
+            end) do
+        reciprocal(0)
+    end
 
 
 reciprocal(value) =

@@ -122,37 +122,37 @@ end
 
 # Testes
 
-# handler_bind(()->reciprocal(0), DivisionByZero =>(c)->println("I saw a division by zero"))
-#
-#
-# handler_bind(DivisionByZero =>
-#             (c)->println("I saw it too")) do
-#                 handler_bind(DivisionByZero =>
-#                     (c)->println("I saw a division by zero")) do
-#                         reciprocal(0)
-#                     end
-#        end
-#
-#
-# block() do escape
-#     handler_bind(DivisionByZero =>
-#                     (c)->(println("I saw it too");
-#                         return_from(escape, "Done"))) do
-#             handler_bind(DivisionByZero =>
-#                         (c)->println("I saw a division by zero")) do
-#             reciprocal(0)
-#         end
-#     end
-# end
-#
-# block() do escape handler_bind(DivisionByZero =>
-#                         (c)->println("I saw it too")) do
-#                         handler_bind(DivisionByZero =>
-#                             (c)->(println("I saw a division by zero"); return_from(escape, "Done"))) do
-#                 reciprocal(0)
-#            end
-#       end
-# end
+handler_bind(()->reciprocal(0), DivisionByZero =>(c)->println("I saw a division by zero"))
+
+
+handler_bind(DivisionByZero =>
+            (c)->println("I saw it too")) do
+                handler_bind(DivisionByZero =>
+                    (c)->println("I saw a division by zero")) do
+                        reciprocal(0)
+                    end
+       end
+
+
+block() do escape
+    handler_bind(DivisionByZero =>
+                    (c)->(println("I saw it too");
+                        return_from(escape, "Done"))) do
+            handler_bind(DivisionByZero =>
+                        (c)->println("I saw a division by zero")) do
+            reciprocal(0)
+        end
+    end
+end
+
+block() do escape handler_bind(DivisionByZero =>
+                        (c)->println("I saw it too")) do
+                        handler_bind(DivisionByZero =>
+                            (c)->(println("I saw a division by zero"); return_from(escape, "Done"))) do
+                reciprocal(0)
+           end
+      end
+end
 
 
 restart_bindings = Dict()
@@ -192,19 +192,19 @@ reciprocal(value) =
 
 # Testes
 
-# handler_bind(DivisionByZero => (c)->invoke_restart(:return_zero)) do
-#          reciprocal(0)
-# end
-#
-# handler_bind(DivisionByZero => (c)->invoke_restart(:return_value,123)) do
-#          reciprocal(0)
-# end
-#
-# handler_bind(DivisionByZero => (c)->invoke_restart(:retry_using, 10)) do
-#   reciprocal(0)
-# end
-#
-# println(restart_bindings)
+handler_bind(DivisionByZero => (c)->invoke_restart(:return_zero)) do
+         reciprocal(0)
+end
+
+handler_bind(DivisionByZero => (c)->invoke_restart(:return_value,123)) do
+         reciprocal(0)
+end
+
+handler_bind(DivisionByZero => (c)->invoke_restart(:retry_using, 10)) do
+  reciprocal(0)
+end
+
+println(restart_bindings)
 
 
 function available_restart(name)
@@ -219,7 +219,7 @@ handler_bind(DivisionByZero =>
                     invoke_restart(restart)
                 end
             end) do
-        reciprocal(3)
+        reciprocal(0)
     end
 
 

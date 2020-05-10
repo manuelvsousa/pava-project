@@ -26,12 +26,6 @@ function block(f)
     try
         f(f)
     catch e
-        # println(typeof(e) == ReturnFromException)
-        # println(isa(e,ReturnFromException))
-        # if typeof(e) == ReturnFromException
-        #     println("novooooo")
-        #     println(f === e.func)
-        # end
         typeof(e) == ReturnFromException && f === e.func ? e.value : throw(e)
     end
 end
@@ -113,50 +107,15 @@ function handler_bind(func,handlers...)
     try
         func()
     catch e
-        # println("Handlers")
-        # println(handlers)
-        # println(e)
-        # println("primeiro catch")
-        # println(e)
-        # println(handlers)
         try
             for i in handlers
-                # println("a percorrer handlers")
-                # println(typeof(i))
-                # println(typeof(i.second))
-                # handler = i.second(i.second)
-                # handler = i.second(i.second)
-                # println("handler")
-                # # println(isa(handler,InvokeRestartStruct))
-                # # println(isa(e,i.first))
-                # # println(dump(i.second(i)))
-                # println(i.first)
-                # println("Estou aqui 1")
                 if isa(e,i.first)
-                    # println("tratar")
-                    # if isa(handler,InvokeRestartStruct)
-                    #     # println("lelelle")
-                    #     # println(handler.second())
-                    #     if isempty(handler.args)
-                    #         return handler.func()
-                    #     else
-                    #         return handler.func(handler.args...)
-                    #     end
-                    # else
-                        i.second(i)
-                        rethrow() # TODO cuidado com isto, se calhar nao pode estar dentro do finally
-                        println("Estou aqui 2")
-                    # end
+                    i.second(i)
+                    rethrow() # TODO cuidado com isto, se calhar nao pode estar dentro do finally
                 end
             end
         catch ee
-            # println("catch 2")
-            # println("catch novo")
             if isa(ee,InvokeRestartStructEx)
-                # println("lelelle")
-                # println(handler.second())
-                # println("dentro da cena nova")
-
                 if isempty(ee.args)
                     return ee.func()
                 else
@@ -166,6 +125,7 @@ function handler_bind(func,handlers...)
                 rethrow()
             end
         end
+        rethrow()
     end
 end
 
@@ -229,7 +189,6 @@ struct InvokeRestartStructEx <: Exception
 end
 
 function invoke_restart(symbol, args...)
-    # println("inside invoke_restart")
     throw(InvokeRestartStructEx(restart_bindings[symbol],args))
 end
 
@@ -254,7 +213,6 @@ handler_bind(DivisionByZero => (c)->invoke_restart(:retry_using, 10)) do
   reciprocal(0)
 end
 
-# invoke_restart(:return_zero).func()
 println(restart_bindings)
 
 
@@ -278,13 +236,12 @@ handler_bind(DivisionByZero =>
 #     handler_bind(DivisionByZero =>
 #         (c)-> for restart in (:return_one, :return_zero, :die_horribly)
 #                 if available_restart(restart)
-#                     println("carralho")
 #                     invoke_restart(restart)
 #                 end
 #             end) do
 #         reciprocal(0)
 #     end
-
+#
 
 reciprocal(0)
 

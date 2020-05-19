@@ -26,7 +26,7 @@ function block(f)
     try
         f(f)
     catch e
-        typeof(e) == ReturnFromException && f === e.func ? e.value : throw(e)
+        typeof(e) == ReturnFromException && f === e.func ? e.value : throw(e) # thrown by return_from
     end
 end
 

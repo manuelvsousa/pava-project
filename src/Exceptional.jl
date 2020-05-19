@@ -80,7 +80,7 @@ mystery(2)
 import Base.error
 
 function error(ex)
-    throw(ex)
+    signal(ex)
 end
 
 reciprocal(x) =
@@ -94,29 +94,44 @@ struct DivisionByZero <: Exception end
 
 dict = Dict()
 
+
+handlersG = []
+
+
 function handler_bind(func,handlers...)
-    try
-        func()
-    catch e
-        try
-            for i in handlers
-                if isa(e,i.first)
-                    i.second(i)
-                    rethrow()
-                end
-            end
-        catch ee
-            if isa(ee,InvokeRestartStructEx)
-                if isempty(ee.args)
-                    return ee.func()
-                else
-                    return ee.func(ee.args...)
-                end
-            else
-                rethrow()
-            end
+    println("handler_bind")
+    for i in handlers
+        append!( handlersG, handlers )
+    end
+    println(typeof(handlers))
+    append!( handlersG, handlers )
+    println(handlersG)
+    func()
+    # handlersG = []
+end
+
+
+function find_handler(e)
+    println("find_handler")
+    println(handlersG)
+    for i in handlersG
+        if isa(e,i.first)
+            return i.second(i)
         end
-        rethrow()
+    end
+end
+
+function signal(e)
+    callback = find_handler(e)
+    println("callback found")
+    println(handlersG)
+    println(callback)
+    if callback == nothing
+        print("SHOULD NOT HAPPEN")
+        throw(e)
+    else
+        println("Vai retornar callback no signal")
+        return callback(e)
     end
 end
 
@@ -154,6 +169,11 @@ block() do escape handler_bind(DivisionByZero =>
       end
 end
 
+struct InvokeRestartStructEx <: Exception
+    func::Any
+    args::Any
+end
+
 
 restart_bindings = Dict()
 
@@ -161,27 +181,41 @@ function restart_bind(func,args...)
     for i in args
         restart_bindings[i.first] = i.second
     end
-    func()
-end
-
-
-# This was kep a struct and not a type as imposed limitations described here:
-# https://discourse.julialang.org/t/why-is-it-impossible-to-subtype-a-struct/19876/27
-
-struct InvokeRestartStruct
-    func::Any
-    args::Any
-end
-
-
-struct InvokeRestartStructEx <: Exception
-    func::Any
-    args::Any
+    try
+        println("lelelle 3")
+        func()
+    catch a
+        println("first catch a:")
+        println(a)
+        try
+            return signal(a)
+        catch e
+            if isa(e,InvokeRestartStructEx)
+                println("lelelle 1")
+                return e.func()
+            end
+        end
+    end
 end
 
 function invoke_restart(symbol, args...)
     throw(InvokeRestartStructEx(restart_bindings[symbol],args))
 end
+
+
+
+## EXEMPLO A BATER
+#
+# handler_bind(DivisionByZero => (c)->invoke_restart(:return_zero)) do
+#   1 + reciprocal(0)
+# end
+
+## EXEMPLO A BATER
+
+handler_bind(DivisionByZero => (c)->invoke_restart(:return_zero)) do
+         1 + reciprocal(0)
+end
+
 
 reciprocal(value) =
     restart_bind(:return_zero => ()->0,

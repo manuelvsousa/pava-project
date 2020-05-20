@@ -30,20 +30,20 @@ function block(f)
     catch e
         if typeof(e) == ReturnFromException
             if f === e.func
-                if e.inside_handler
-                    println(e.handlers_counter)
-                    println(handlersG)
-                    for i in  1: (e.handlers_counter)
-                        pop!(handlersG)
-                    end
-                end
+                # if e.inside_handler
+                #     println(e.handlers_counter)
+                #     println(handlersG)
+                #     # for i in  1: (e.handlers_counter)
+                #     #     pop!(handlersG)
+                #     # end
+                # end
                 e.value
-            else
-                if e.inside_handler
-                    throw(ReturnFromException(e.func,e.value, e.handlers_counter + 1, true))
-                else
-                    throw(e)
-                end
+            # else
+            #     if e.inside_handler
+            #         throw(ReturnFromException(e.func,e.value, e.handlers_counter + 1, true))
+            #     else
+            #         throw(e)
+            #     end
             end
         else
             throw(e)
@@ -103,18 +103,18 @@ mystery(2)
 import Base.error
 
 function error(ex)
-    try
+    # try
         return signal(ex)
-    catch e
-        # println("error catch")
-        # println(e)
-        # println(typeof(e))
-        if isa(e,ReturnFromException)
-            throw(ReturnFromException(e.func,e.value, 1, true))
-        else
-            throw(e)
-        end
-    end
+    # catch e
+    #     # println("error catch")
+    #     # println(e)
+    #     # println(typeof(e))
+    #     if isa(e,ReturnFromException)
+    #         throw(ReturnFromException(e.func,e.value, 1, true))
+    #     else
+    #         throw(e)
+    #     end
+    # end
 end
 
 reciprocal(x) =
@@ -133,18 +133,35 @@ handlersG = []
 
 function handler_bind(func,handlers...)
     append!( handlersG, [handlers] )
+    # println("handler_bind handlers")
     # println(handlersG)
-    func()
-    pop!(handlersG)
-    return # This is to avoid returning the result of pop
+    # println(length(handlersG))
+    # try
+        func()
+    # catch e
+    #     # println("handler_bind catch")
+    #     # println(e)
+    #     # println(typeof(e))
+    #     # println("current handlers")
+    #     # println(handlersG)
+    #     # if isa(e,ReturnFromException)
+    #     #     # println("ATENCAO QUE vai popar")
+    #     #     pop!(handlersG)
+    #     # end
+    #     throw(e)
+    # end
+    # println("pop esquisito")
+    # pop!(handlersG)
+    # return # This is to avoid returning the result of pop
 end
 
 
 function find_handler(e)
+    # println("find_handler")
     for i in handlersG[end]
         if isa(e,i.first)
             # println("encontrou")
-            return i.second(i)
+            return i.second
         end
     end
     # println("sem handlers")
@@ -152,19 +169,42 @@ function find_handler(e)
 end
 
 function signal(e)
+    # println("signal")
+    # println(e)
+    # println(handlersG)
     callback = find_handler(e)
     if callback == nothing
         if length(handlersG) > 1
+            # println("caralhgo 1")
+            # println(e)
+            # println(handlersG)
             pop!(handlersG)
             # println("caralhgo")
             return signal(e)
-        elseif length(handlersG) == 1
-            # println("caralhgo 2")
-            pop!(handlersG)
-            throw(e)
+        # elseif length(handlersG) == 1
+        #     # println("caralhgo 2")
+        #     # println(handlersG)
+        #     pop!(handlersG)
+        #     throw(e)
         end
+        throw(e)
     else
-        return callback(e)
+        # println("vai retornar callback")
+        callback(e)
+        if length(handlersG) > 1
+            # println("caralhgo 1")
+            # println(e)
+            # println(handlersG)
+            pop!(handlersG)
+            # println("caralhgo")
+            return signal(e)
+        # elseif length(handlersG) == 1
+        #     # println("caralhgo 2")
+        #     # println(handlersG)
+        #     pop!(handlersG)
+        #     throw(e)
+        end
+        throw(e)
     end
 end
 
@@ -203,22 +243,22 @@ block() do escape handler_bind(DivisionByZero =>
 end
 
 
-block() do escape handler_bind(DivisionByZero =>
-                        (c)->println("I saw it too")) do
-
-                        println("qqqqqq")
-                        block() do escape2 handler_bind(DivisionByZero =>
-                                                (c)->println("I saw it too 2")) do
-                                                handler_bind(DivisionByZero =>
-                                                    (c)->(println("I saw a division by zero"); return_from(escape2, "Done"))) do
-                                        reciprocal(0)
-                                   end
-                              end
-                        end
-                        println("qqqqqq 2")
-
-      end
-end
+# block() do escape handler_bind(DivisionByZero =>
+#                         (c)->println("I saw it too")) do
+#
+#                         println("qqqqqq")
+#                         block() do escape2 handler_bind(DivisionByZero =>
+#                                                 (c)->println("I saw it too 2")) do
+#                                                 handler_bind(DivisionByZero =>
+#                                                     (c)->(println("I saw a division by zero"); return_from(escape2, "Done"))) do
+#                                         reciprocal(0)
+#                                    end
+#                               end
+#                         end
+#                         println("qqqqqq 2")
+#
+#       end
+# end
 
 struct InvokeRestartStructEx <: Exception
     func::Any

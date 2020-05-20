@@ -20,18 +20,39 @@
 struct ReturnFromException <: Exception
     func::Function
     value::Any
+    handlers_counter::Int
+    inside_handler::Bool
 end
 
 function block(f)
     try
         f(f)
     catch e
-        typeof(e) == ReturnFromException && f === e.func ? e.value : throw(e) # thrown by return_from
+        if typeof(e) == ReturnFromException
+            if f === e.func
+                if e.inside_handler
+                    println(e.handlers_counter)
+                    println(handlersG)
+                    for i in  1: (e.handlers_counter)
+                        pop!(handlersG)
+                    end
+                end
+                e.value
+            else
+                if e.inside_handler
+                    throw(ReturnFromException(e.func,e.value, e.handlers_counter + 1, true))
+                else
+                    throw(e)
+                end
+            end
+        else
+            throw(e)
+        end
     end
 end
 
 function return_from(func, value = nothing)
-    throw(ReturnFromException(func,value))
+    throw(ReturnFromException(func,value, 0, false))
 end
 
 # Tunned example from project spec
@@ -77,10 +98,23 @@ mystery(0)
 mystery(1)
 mystery(2)
 
+# println("lelelel")
+
 import Base.error
 
 function error(ex)
-    signal(ex)
+    try
+        return signal(ex)
+    catch e
+        # println("error catch")
+        # println(e)
+        # println(typeof(e))
+        if isa(e,ReturnFromException)
+            throw(ReturnFromException(e.func,e.value, 1, true))
+        else
+            throw(e)
+        end
+    end
 end
 
 reciprocal(x) =
@@ -97,40 +131,39 @@ dict = Dict()
 
 handlersG = []
 
-
 function handler_bind(func,handlers...)
-    println("handler_bind")
-    for i in handlers
-        append!( handlersG, handlers )
-    end
-    println(typeof(handlers))
-    append!( handlersG, handlers )
-    println(handlersG)
+    append!( handlersG, [handlers] )
+    # println(handlersG)
     func()
-    # handlersG = []
+    pop!(handlersG)
+    return # This is to avoid returning the result of pop
 end
 
 
 function find_handler(e)
-    println("find_handler")
-    println(handlersG)
-    for i in handlersG
+    for i in handlersG[end]
         if isa(e,i.first)
+            # println("encontrou")
             return i.second(i)
         end
     end
+    # println("sem handlers")
+    # println(e)
 end
 
 function signal(e)
     callback = find_handler(e)
-    println("callback found")
-    println(handlersG)
-    println(callback)
     if callback == nothing
-        print("SHOULD NOT HAPPEN")
-        throw(e)
+        if length(handlersG) > 1
+            pop!(handlersG)
+            # println("caralhgo")
+            return signal(e)
+        elseif length(handlersG) == 1
+            # println("caralhgo 2")
+            pop!(handlersG)
+            throw(e)
+        end
     else
-        println("Vai retornar callback no signal")
         return callback(e)
     end
 end
@@ -169,6 +202,24 @@ block() do escape handler_bind(DivisionByZero =>
       end
 end
 
+
+block() do escape handler_bind(DivisionByZero =>
+                        (c)->println("I saw it too")) do
+
+                        println("qqqqqq")
+                        block() do escape2 handler_bind(DivisionByZero =>
+                                                (c)->println("I saw it too 2")) do
+                                                handler_bind(DivisionByZero =>
+                                                    (c)->(println("I saw a division by zero"); return_from(escape2, "Done"))) do
+                                        reciprocal(0)
+                                   end
+                              end
+                        end
+                        println("qqqqqq 2")
+
+      end
+end
+
 struct InvokeRestartStructEx <: Exception
     func::Any
     args::Any
@@ -182,17 +233,17 @@ function restart_bind(func,args...)
         restart_bindings[i.first] = i.second
     end
     try
-        println("lelelle 3")
         func()
     catch a
-        println("first catch a:")
-        println(a)
         try
+            # println("segundo try")
+            # println(a)
             return signal(a)
         catch e
+            # println("segundo catch")
+            # println(e)
             if isa(e,InvokeRestartStructEx)
-                println("lelelle 1")
-                return e.func()
+                return e.func(e.args...)
             end
         end
     end
@@ -212,9 +263,6 @@ end
 
 ## EXEMPLO A BATER
 
-handler_bind(DivisionByZero => (c)->invoke_restart(:return_zero)) do
-         1 + reciprocal(0)
-end
 
 
 reciprocal(value) =
@@ -224,11 +272,22 @@ reciprocal(value) =
                 value == 0 ? error(DivisionByZero()) : 1/value
     end
 
+
+
+handler_bind(DivisionByZero => (c)->invoke_restart(:return_zero)) do
+         1 + reciprocal(0) + 1 + 1
+end
+
+
 # Testes
+
+println(restart_bindings)
 
 handler_bind(DivisionByZero => (c)->invoke_restart(:return_zero)) do
          reciprocal(0)
 end
+
+handlersG = []
 
 handler_bind(DivisionByZero => (c)->invoke_restart(:return_value,123)) do
          reciprocal(0)

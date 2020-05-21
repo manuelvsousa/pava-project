@@ -1,61 +1,29 @@
-# Data structures
-
-#
-# • block(func) DONE
-# • return_from(name, value=nothing) DONE
-# • available_restart(name)
-# • invoke_restart(name, args...) DONE
-# • restart_bind(func, restarts...) DONE
-# • error(exception::Exception) DONE
-# • handler_bind(func, handlers...) DONE
-
-
-# Functions
-
-
-# block function
-# Hints: does not need to throw Exception of throwable. It gives freedom to throw other things
-
+struct DivisionByZero <: Exception end
 
 struct ReturnFromException <: Exception
     func::Function
     value::Any
 end
 
+struct InvokeRestartException <: Exception
+    name::Any
+    args::Any
+end
+
+handlers_stack = []
+restarts_stack = []
+
 function block(f)
     try
         f(f)
     catch e
-        typeof(e) == ReturnFromException && f === e.func ? e.value : throw(e) # thrown by return_from
+        typeof(e) == ReturnFromException && f === e.func ? e.value : throw(e)
     end
 end
 
 function return_from(func, value = nothing)
     throw(ReturnFromException(func,value))
 end
-
-# Tunned example from project spec
-
-# mystery(n) =
-#     1 +
-#     block() do outer
-#         1 +
-#         block() do inner
-#             1 +
-#             block() do innerx2
-#                 1 +
-#                 if n == 0
-#                     return_from(inner,11)
-#                 elseif n == 1
-#                     return_from(outer,1)
-#                 else
-#                     return_from(innerx2,2)
-#                 end
-#             end
-#         end
-#     end
-# end
-
 
 mystery(n) =
     1+
@@ -101,15 +69,6 @@ reciprocal(x) =
     error(DivisionByZero()) :
     1/x
 
-struct DivisionByZero <: Exception end
-
-# Base.showerror(io::IO, e::DivisionByZero) = print(io, e.msg)
-
-dict = Dict()
-
-
-handlers_stack = []
-
 function handler_bind(func,handlers...)
     append!( handlers_stack, [handlers] )
     return_object = Any
@@ -145,12 +104,10 @@ function signal(e)
         callback(e)
         if length(handlers_stack) > 1
             poped = pop!(handlers_stack)
-            # fds = pop!(restarts_stack)
             try
                 signal(e)
             catch ee
                 append!(handlers_stack,[poped])
-                # append!(restarts_stack,[fds])
                 throw(ee)
             end
         else
@@ -162,49 +119,39 @@ function signal(e)
 end
 
 # Testes
-
-handler_bind(()->reciprocal(0), DivisionByZero =>(c)->println("I saw a division by zero"))
-
-
-handler_bind(DivisionByZero =>
-            (c)->println("I saw it too")) do
-                handler_bind(DivisionByZero =>
-                    (c)->println("I saw a division by zero")) do
-                        reciprocal(0)
-                    end
-       end
-
-
-block() do escape
-    handler_bind(DivisionByZero =>
-                    (c)->(println("I saw it too");
-                        return_from(escape, "Done"))) do
-            handler_bind(DivisionByZero =>
-                        (c)->println("I saw a division by zero")) do
-            reciprocal(0)
-        end
-    end
-end
-
-
-block() do escape handler_bind(DivisionByZero =>
-                        (c)->println("I saw it too")) do
-                        handler_bind(DivisionByZero =>
-                            (c)->(println("I saw a division by zero"); return_from(escape, "Done"))) do
-                reciprocal(0)
-           end
-      end
-end
-
-
-struct InvokeRestartStructEx <: Exception
-    name::Any
-    args::Any
-end
-
-
-
-restarts_stack = []
+#
+# handler_bind(()->reciprocal(0), DivisionByZero =>(c)->println("I saw a division by zero"))
+#
+#
+# handler_bind(DivisionByZero =>
+#             (c)->println("I saw it too")) do
+#                 handler_bind(DivisionByZero =>
+#                     (c)->println("I saw a division by zero")) do
+#                         reciprocal(0)
+#                     end
+#        end
+#
+#
+# block() do escape
+#     handler_bind(DivisionByZero =>
+#                     (c)->(println("I saw it too");
+#                         return_from(escape, "Done"))) do
+#             handler_bind(DivisionByZero =>
+#                         (c)->println("I saw a division by zero")) do
+#             reciprocal(0)
+#         end
+#     end
+# end
+#
+#
+# block() do escape handler_bind(DivisionByZero =>
+#                         (c)->println("I saw it too")) do
+#                         handler_bind(DivisionByZero =>
+#                             (c)->(println("I saw a division by zero"); return_from(escape, "Done"))) do
+#                 reciprocal(0)
+#            end
+#       end
+# end
 
 function restart_bind(func,args...)
     tmp = Dict()
@@ -219,7 +166,7 @@ function restart_bind(func,args...)
         try
             signal(a)
         catch e
-            if isa(e,InvokeRestartStructEx) && !isempty(restarts_stack)
+            if isa(e,InvokeRestartException) && !isempty(restarts_stack)
                 if e.name ∉ keys(restarts_stack[end])
                     pop!(restarts_stack)
                     throw(e)
@@ -236,10 +183,9 @@ function restart_bind(func,args...)
     return return_value
 end
 
-reciprocal(0)
 
 function invoke_restart(symbol, args...)
-    throw(InvokeRestartStructEx(symbol,args))
+    throw(InvokeRestartException(symbol,args))
 end
 
 reciprocal(value) =
@@ -302,11 +248,8 @@ handler_bind(DivisionByZero =>
         reciprocal(0)
     end
 
-# asd = reciprocal(0)
-reciprocal(0)
-
 infinity() =
-    restart_bind(:just_do_itt => ()->1/0) do
+    restart_bind(:just_do_it => ()->1/0) do
         reciprocal(0)
     end
 

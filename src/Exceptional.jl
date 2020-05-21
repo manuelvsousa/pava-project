@@ -86,6 +86,10 @@ function error(ex)
     try
         return signal(ex)
     catch e
+        # If I am seeing the same exception I had signaled before,
+        # means none of the handlers were able to handle it
+        # So, I will just print the message as described in project spec
+        # and throw it in the end
         if isa(e,typeof(ex))
             print("ERROR: ")
             print(e)
@@ -115,9 +119,6 @@ function handler_bind(func,handlers...)
     try
         return_object = func()
     catch e
-        # if isa(e,ReturnFromException)
-        #     throw(e)
-        # end
         pop!(handlersG)
         throw(e)
     end

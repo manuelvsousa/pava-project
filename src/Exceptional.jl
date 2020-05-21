@@ -1,4 +1,5 @@
 struct DivisionByZero <: Exception end
+struct NoRestartExistException <: Exception end
 
 struct ReturnFromException <: Exception
     func::Function
@@ -104,10 +105,12 @@ function signal(e)
         callback(e)
         if length(handlers_stack) > 1
             poped = pop!(handlers_stack)
+            # fds = pop!(restarts_stack)
             try
                 signal(e)
             catch ee
                 append!(handlers_stack,[poped])
+                # append!(restarts_stack,[fds])
                 throw(ee)
             end
         else
@@ -119,10 +122,10 @@ function signal(e)
 end
 
 # Testes
-#
+
 # handler_bind(()->reciprocal(0), DivisionByZero =>(c)->println("I saw a division by zero"))
-#
-#
+
+
 # handler_bind(DivisionByZero =>
 #             (c)->println("I saw it too")) do
 #                 handler_bind(DivisionByZero =>
@@ -130,8 +133,8 @@ end
 #                         reciprocal(0)
 #                     end
 #        end
-#
-#
+
+
 # block() do escape
 #     handler_bind(DivisionByZero =>
 #                     (c)->(println("I saw it too");
@@ -142,16 +145,16 @@ end
 #         end
 #     end
 # end
-#
-#
-# block() do escape handler_bind(DivisionByZero =>
-#                         (c)->println("I saw it too")) do
-#                         handler_bind(DivisionByZero =>
-#                             (c)->(println("I saw a division by zero"); return_from(escape, "Done"))) do
-#                 reciprocal(0)
-#            end
-#       end
-# end
+
+
+block() do escape handler_bind(DivisionByZero =>
+                        (c)->println("I saw it too")) do
+                        handler_bind(DivisionByZero =>
+                            (c)->(println("I saw a division by zero"); return_from(escape, "Done"))) do
+                reciprocal(0)
+           end
+      end
+end
 
 function restart_bind(func,args...)
     tmp = Dict()
@@ -169,7 +172,11 @@ function restart_bind(func,args...)
             if isa(e,InvokeRestartException) && !isempty(restarts_stack)
                 if e.name ∉ keys(restarts_stack[end])
                     pop!(restarts_stack)
-                    throw(e)
+                    if isempty(restarts_stack)
+                        throw(NoRestartExistException())
+                    else
+                        throw(e)
+                    end
                 else
                     return_value = restarts_stack[end][e.name](e.args...)
                 end
@@ -182,7 +189,6 @@ function restart_bind(func,args...)
     pop!(restarts_stack)
     return return_value
 end
-
 
 function invoke_restart(symbol, args...)
     throw(InvokeRestartException(symbol,args))
@@ -247,6 +253,7 @@ handler_bind(DivisionByZero =>
             end) do
         reciprocal(0)
     end
+
 
 infinity() =
     restart_bind(:just_do_it => ()->1/0) do

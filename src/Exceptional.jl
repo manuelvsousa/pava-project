@@ -136,22 +136,27 @@ function handler_bind(func,handlers...)
     # println("handler_bind handlers")
     # println(handlersG)
     # println(length(handlersG))
-    # try
-        func()
-    # catch e
-    #     # println("handler_bind catch")
-    #     # println(e)
-    #     # println(typeof(e))
-    #     # println("current handlers")
-    #     # println(handlersG)
-    #     # if isa(e,ReturnFromException)
-    #     #     # println("ATENCAO QUE vai popar")
-    #     #     pop!(handlersG)
-    #     # end
-    #     throw(e)
-    # end
-    # println("pop esquisito")
-    # pop!(handlersG)
+    asddd = Any
+    try
+        asddd = func()
+    catch e
+        # println("handler_bind catch")
+        # println(e)
+        # println(func)
+        # println(typeof(e))
+        # println("current handlers")
+        # println(handlersG)
+        # if isa(e,ReturnFromException)
+            println("ATENCAO QUE vai popar")
+            pop!(handlersG)
+        # end
+        throw(e)
+    end
+    println("pop esquisito")
+    println(handlersG)
+    pop!(handlersG)
+    println(asddd)
+    return asddd
     # return # This is to avoid returning the result of pop
 end
 
@@ -169,41 +174,32 @@ function find_handler(e)
 end
 
 function signal(e)
-    # println("signal")
-    # println(e)
-    # println(handlersG)
     callback = find_handler(e)
-    if callback == nothing
-        if length(handlersG) > 1
-            # println("caralhgo 1")
-            # println(e)
-            # println(handlersG)
-            pop!(handlersG)
-            # println("caralhgo")
-            return signal(e)
-        # elseif length(handlersG) == 1
-        #     # println("caralhgo 2")
-        #     # println(handlersG)
-        #     pop!(handlersG)
-        #     throw(e)
-        end
-        throw(e)
-    else
-        # println("vai retornar callback")
+    if callback != nothing
         callback(e)
+
         if length(handlersG) > 1
-            # println("caralhgo 1")
-            # println(e)
-            # println(handlersG)
-            pop!(handlersG)
-            # println("caralhgo")
-            return signal(e)
-        # elseif length(handlersG) == 1
-        #     # println("caralhgo 2")
-        #     # println(handlersG)
-        #     pop!(handlersG)
-        #     throw(e)
+            # println("LETS POPPPPPINNNN 3")
+            asd = pop!(handlersG)
+            # println("BEFORE POPPPPPINNNN 3")
+            try
+                signal(e)
+            catch ee
+                println("lets redo the fucking operation")
+                println(asd)
+                # comment this sectipon very well
+                append!(handlersG,[asd])
+                # println(ee)
+                throw(ee)
+            end
+        else
+            println("LETS POPPPPPINNNN 2")
+            # pop!(handlersG)
+            println(e)
+            println("BEFORE POPPPPPINNNN 2")
+            throw(e)
         end
+    else
         throw(e)
     end
 end
@@ -228,7 +224,9 @@ block() do escape
                         return_from(escape, "Done"))) do
             handler_bind(DivisionByZero =>
                         (c)->println("I saw a division by zero")) do
+                        println("do caralho")
             reciprocal(0)
+            println("ola")
         end
     end
 end
@@ -250,7 +248,7 @@ end
 #                         block() do escape2 handler_bind(DivisionByZero =>
 #                                                 (c)->println("I saw it too 2")) do
 #                                                 handler_bind(DivisionByZero =>
-#                                                     (c)->(println("I saw a division by zero"); return_from(escape2, "Done"))) do
+#                                                     (c)->(println("I saw a division by zero"); return_from(escape, "Done"))) do
 #                                         reciprocal(0)
 #                                    end
 #                               end
@@ -276,13 +274,14 @@ function restart_bind(func,args...)
         func()
     catch a
         try
-            # println("segundo try")
-            # println(a)
+            println("segundo try")
+            println(a)
             return signal(a)
         catch e
-            # println("segundo catch")
-            # println(e)
+            println("segundo catch")
+            println(e)
             if isa(e,InvokeRestartStructEx)
+                println("a retornar valor")
                 return e.func(e.args...)
             end
         end
@@ -326,8 +325,6 @@ println(restart_bindings)
 handler_bind(DivisionByZero => (c)->invoke_restart(:return_zero)) do
          reciprocal(0)
 end
-
-handlersG = []
 
 handler_bind(DivisionByZero => (c)->invoke_restart(:return_value,123)) do
          reciprocal(0)

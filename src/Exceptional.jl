@@ -1,3 +1,5 @@
+import Base.error
+
 struct DivisionByZero <: Exception end
 struct NoRestartExistException <: Exception end
 
@@ -25,28 +27,6 @@ end
 function return_from(func, value = nothing)
     throw(ReturnFromException(func,value))
 end
-
-mystery(n) =
-    1+
-    block() do outer
-        1+
-        block() do inner
-            1+
-            if n == 0
-                return_from(inner, 1)
-            elseif n == 1 return_from(outer, 1)
-            else
-                1
-            end
-        end
-    end
-
-mystery(0)
-mystery(1)
-mystery(2)
-
-
-import Base.error
 
 function error(ex)
     try
@@ -121,41 +101,6 @@ function signal(e)
     end
 end
 
-# Testes
-
-# handler_bind(()->reciprocal(0), DivisionByZero =>(c)->println("I saw a division by zero"))
-
-
-# handler_bind(DivisionByZero =>
-#             (c)->println("I saw it too")) do
-#                 handler_bind(DivisionByZero =>
-#                     (c)->println("I saw a division by zero")) do
-#                         reciprocal(0)
-#                     end
-#        end
-
-
-# block() do escape
-#     handler_bind(DivisionByZero =>
-#                     (c)->(println("I saw it too");
-#                         return_from(escape, "Done"))) do
-#             handler_bind(DivisionByZero =>
-#                         (c)->println("I saw a division by zero")) do
-#             reciprocal(0)
-#         end
-#     end
-# end
-
-
-block() do escape handler_bind(DivisionByZero =>
-                        (c)->println("I saw it too")) do
-                        handler_bind(DivisionByZero =>
-                            (c)->(println("I saw a division by zero"); return_from(escape, "Done"))) do
-                reciprocal(0)
-           end
-      end
-end
-
 function restart_bind(func,args...)
     tmp = Dict()
     for i in args
@@ -194,45 +139,6 @@ function invoke_restart(symbol, args...)
     throw(InvokeRestartException(symbol,args))
 end
 
-reciprocal(value) =
-    restart_bind(:return_zero => ()->0,
-             :return_value => identity,
-             :retry_using => reciprocal) do
-                value == 0 ? error(DivisionByZero()) : 1/value
-    end
-
-
-
-handler_bind(DivisionByZero => (c)->invoke_restart(:return_zero)) do
-         1 + reciprocal(0) + 1 + 1 + 1
-end
-
-handler_bind(DivisionByZero => (c)->invoke_restart(:return_zero)) do
-  1 + reciprocal(0)
-end
-
-divide(x, y) = x*reciprocal(y)
-
-handler_bind(DivisionByZero => (c)->invoke_restart(:return_value, 3)) do
-  divide(2, 0)
-end
-
-# Testes
-
-
-handler_bind(DivisionByZero => (c)->invoke_restart(:return_zero)) do
-         reciprocal(0)
-end
-
-handler_bind(DivisionByZero => (c)->invoke_restart(:return_value,123)) do
-         reciprocal(0)
-end
-
-handler_bind(DivisionByZero => (c)->invoke_restart(:retry_using, 10)) do
-  reciprocal(0)
-end
-
-
 
 function available_restart(name)
     for i in restarts_stack
@@ -241,37 +147,4 @@ function available_restart(name)
         end
     end
     return false
-end
-
-
-
-handler_bind(DivisionByZero =>
-        (c)-> for restart in (:return_one, :return_zero, :die_horribly)
-                if available_restart(restart)
-                    invoke_restart(restart)
-                end
-            end) do
-        reciprocal(0)
-    end
-
-
-infinity() =
-    restart_bind(:just_do_it => ()->1/0) do
-        reciprocal(0)
-    end
-
-handler_bind(DivisionByZero => (c)->invoke_restart(:return_zero)) do
-    infinity()
-end
-
-handler_bind(DivisionByZero => (c)->invoke_restart(:return_value, 1)) do
-  infinity()
-end
-
-handler_bind(DivisionByZero => (c)->invoke_restart(:retry_using, 10)) do
-  infinity()
-end
-
-handler_bind(DivisionByZero => (c)->invoke_restart(:just_do_it)) do
-  infinity()
 end

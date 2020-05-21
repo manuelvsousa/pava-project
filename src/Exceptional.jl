@@ -126,6 +126,9 @@ end
 
 
 function find_handler(e)
+    if isempty(handlers_stack)
+        return nothing
+    end
     for i in handlers_stack[end]
         if isa(e,i.first)
             return i.second
@@ -143,14 +146,12 @@ function signal(e)
         callback(e)
         if length(handlers_stack) > 1
             poped = pop!(handlers_stack)
-            fds = pop!(restarts_stack)
+            # fds = pop!(restarts_stack)
             try
                 signal(e)
             catch ee
-                println("Entrou para popar")
-                println(ee)
                 append!(handlers_stack,[poped])
-                append!(restarts_stack,[fds])
+                # append!(restarts_stack,[fds])
                 throw(ee)
             end
         else
@@ -225,7 +226,6 @@ function restart_bind(func,args...)
         try
             signal(a)
         catch e
-            println(restarts_stack)
             if isa(e,InvokeRestartStructEx) && !isempty(restarts_stack)
                 if e.name ∉ keys(restarts_stack[end])
                     pop!(restarts_stack)

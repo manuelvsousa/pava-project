@@ -205,18 +205,6 @@ function invoke_restart(symbol, args...)
     throw(InvokeRestartStructEx(restart_bindings[symbol],args))
 end
 
-
-
-## EXEMPLO A BATER
-#
-# handler_bind(DivisionByZero => (c)->invoke_restart(:return_zero)) do
-#   1 + reciprocal(0)
-# end
-
-## EXEMPLO A BATER
-
-
-
 reciprocal(value) =
     restart_bind(:return_zero => ()->0,
              :return_value => identity,

@@ -133,11 +133,11 @@ function signal(e)
     if callback != nothing
         callback(e)
         if length(handlersG) > 1
-            asd = pop!(handlersG)
+            poped = pop!(handlersG)
             try
                 signal(e)
             catch ee
-                append!(handlersG,[asd])
+                append!(handlersG,[poped])
                 throw(ee)
             end
         else

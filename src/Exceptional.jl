@@ -71,7 +71,6 @@ mystery(n) =
             end
         end
     end
-end
 
 mystery(0)
 mystery(1)
@@ -187,19 +186,13 @@ block() do escape
     end
 end
 
+
 block() do escape handler_bind(DivisionByZero =>
                         (c)->println("I saw it too")) do
                         handler_bind(DivisionByZero =>
                             (c)->(println("I saw a division by zero"); return_from(escape, "Done"))) do
                 reciprocal(0)
            end
-      end
-end
-
-block() do escape handler_bind(DivisionByZero =>
-                            (c)->(println("I saw a division by zero"); return_from(escape, "Done"))) do
-                            println("PPPPPPPP")
-                reciprocal(0)
       end
 end
 
@@ -313,7 +306,7 @@ handler_bind(DivisionByZero =>
 reciprocal(0)
 
 infinity() =
-    restart_bind(:just_do_it => ()->1/0) do
+    restart_bind(:just_do_itt => ()->1/0) do
         reciprocal(0)
     end
 

@@ -86,7 +86,7 @@ function error(ex)
     try
         return signal(ex)
     catch e
-        if !isa(e,ReturnFromException) && !isa(e,InvokeRestartStructEx)
+        if isa(e,typeof(ex))
             print("ERROR: ")
             print(e)
             println(" was not handled.")
@@ -272,6 +272,7 @@ handler_bind(DivisionByZero =>
         reciprocal(0)
     end
 
+asd = reciprocal(0)
 infinity() =
     restart_bind(:just_do_it => ()->1/0) do
         reciprocal(0)

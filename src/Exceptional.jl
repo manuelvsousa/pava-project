@@ -111,24 +111,24 @@ struct DivisionByZero <: Exception end
 dict = Dict()
 
 
-handlersG = []
+handlers_stack = []
 
 function handler_bind(func,handlers...)
-    append!( handlersG, [handlers] )
+    append!( handlers_stack, [handlers] )
     return_object = Any
     try
         return_object = func()
     catch e
-        pop!(handlersG)
+        pop!(handlers_stack)
         throw(e)
     end
-    pop!(handlersG)
+    pop!(handlers_stack)
     return return_object
 end
 
 
 function find_handler(e)
-    for i in handlersG[end]
+    for i in handlers_stack[end]
         if isa(e,i.first)
             return i.second
         end
@@ -139,12 +139,12 @@ function signal(e)
     callback = find_handler(e)
     if callback != nothing
         callback(e)
-        if length(handlersG) > 1
-            poped = pop!(handlersG)
+        if length(handlers_stack) > 1
+            poped = pop!(handlers_stack)
             try
                 signal(e)
             catch ee
-                append!(handlersG,[poped])
+                append!(handlers_stack,[poped])
                 throw(ee)
             end
         else

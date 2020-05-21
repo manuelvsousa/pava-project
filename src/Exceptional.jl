@@ -83,7 +83,16 @@ mystery(2)
 import Base.error
 
 function error(ex)
-    return signal(ex)
+    try
+        return signal(ex)
+    catch e
+        if !isa(e,ReturnFromException) && !isa(e,InvokeRestartStructEx)
+            print("ERROR: ")
+            print(e)
+            println(" was not handled.")
+        end
+        throw(e)
+    end
 end
 
 reciprocal(x) =
@@ -106,14 +115,11 @@ function handler_bind(func,handlers...)
     try
         return_object = func()
     catch e
-        if isa(e,ReturnFromException)
-            throw(e)
-        end
+        # if isa(e,ReturnFromException)
+        #     throw(e)
+        # end
         pop!(handlersG)
-        print("ERROR: ")
-        print(e)
-        println(" was not handled.")
-        return
+        throw(e)
     end
     pop!(handlersG)
     return return_object
@@ -265,9 +271,6 @@ handler_bind(DivisionByZero =>
             end) do
         reciprocal(0)
     end
-
-
-reciprocal(0)
 
 infinity() =
     restart_bind(:just_do_it => ()->1/0) do

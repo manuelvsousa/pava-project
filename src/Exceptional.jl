@@ -20,8 +20,6 @@
 struct ReturnFromException <: Exception
     func::Function
     value::Any
-    handlers_counter::Int
-    inside_handler::Bool
 end
 
 function block(f)
@@ -33,7 +31,7 @@ function block(f)
 end
 
 function return_from(func, value = nothing)
-    throw(ReturnFromException(func,value, 0, false))
+    throw(ReturnFromException(func,value))
 end
 
 # Tunned example from project spec
@@ -138,13 +136,21 @@ end
 function signal(e)
     callback = find_handler(e)
     if callback != nothing
+        # This callback can perfectly throw a return_from or invoke_restart
+        # We do not try-catch this callback here as a design choise, thus, all exceptions will be sent to
+        # the corresponding [handler,restart]_bind functions which might trigger different actions
+        # such as poping the restart/handler stacks
         callback(e)
         if length(handlers_stack) > 1
             poped = pop!(handlers_stack)
+            fds = pop!(restarts_stack)
             try
                 signal(e)
             catch ee
+                println("Entrou para popar")
+                println(ee)
                 append!(handlers_stack,[poped])
+                append!(restarts_stack,[fds])
                 throw(ee)
             end
         else
@@ -189,33 +195,58 @@ block() do escape handler_bind(DivisionByZero =>
       end
 end
 
+block() do escape handler_bind(DivisionByZero =>
+                            (c)->(println("I saw a division by zero"); return_from(escape, "Done"))) do
+                            println("PPPPPPPP")
+                reciprocal(0)
+      end
+end
+
+
 struct InvokeRestartStructEx <: Exception
-    func::Any
+    name::Any
     args::Any
 end
 
 
-restart_bindings = Dict()
+
+restarts_stack = []
 
 function restart_bind(func,args...)
+    tmp = Dict()
     for i in args
-        restart_bindings[i.first] = i.second
+        tmp[i.first] = i.second
     end
+    append!(restarts_stack,[tmp])
+    return_value = Any
     try
-        func()
+        return_value = func()
     catch a
         try
-            return signal(a)
+            signal(a)
         catch e
-            if isa(e,InvokeRestartStructEx)
-                return e.func(e.args...)
+            println(restarts_stack)
+            if isa(e,InvokeRestartStructEx) && !isempty(restarts_stack)
+                if e.name ∉ keys(restarts_stack[end])
+                    pop!(restarts_stack)
+                    throw(e)
+                else
+                    return_value = restarts_stack[end][e.name](e.args...)
+                end
+            else
+                pop!(restarts_stack)
+                throw(e)
             end
         end
     end
+    pop!(restarts_stack)
+    return return_value
 end
 
+reciprocal(0)
+
 function invoke_restart(symbol, args...)
-    throw(InvokeRestartStructEx(restart_bindings[symbol],args))
+    throw(InvokeRestartStructEx(symbol,args))
 end
 
 reciprocal(value) =
@@ -259,7 +290,12 @@ end
 
 
 function available_restart(name)
-    return name in keys(restart_bindings)
+    for i in restarts_stack
+        if name in keys(i)
+            return true
+        end
+    end
+    return false
 end
 
 
@@ -273,7 +309,9 @@ handler_bind(DivisionByZero =>
         reciprocal(0)
     end
 
-asd = reciprocal(0)
+# asd = reciprocal(0)
+reciprocal(0)
+
 infinity() =
     restart_bind(:just_do_it => ()->1/0) do
         reciprocal(0)

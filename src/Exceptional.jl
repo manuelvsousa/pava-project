@@ -102,15 +102,21 @@ handlersG = []
 
 function handler_bind(func,handlers...)
     append!( handlersG, [handlers] )
-    asddd = Any
+    return_object = Any
     try
-        asddd = func()
+        return_object = func()
     catch e
+        if isa(e,ReturnFromException)
+            throw(e)
+        end
         pop!(handlersG)
-        throw(e)
+        print("ERROR: ")
+        print(e)
+        println(" was not handled.")
+        return
     end
     pop!(handlersG)
-    return asddd
+    return return_object
 end
 
 
@@ -218,6 +224,15 @@ handler_bind(DivisionByZero => (c)->invoke_restart(:return_zero)) do
          1 + reciprocal(0) + 1 + 1 + 1
 end
 
+handler_bind(DivisionByZero => (c)->invoke_restart(:return_zero)) do
+  1 + reciprocal(0)
+end
+
+divide(x, y) = x*reciprocal(y)
+
+handler_bind(DivisionByZero => (c)->invoke_restart(:return_value, 3)) do
+  divide(2, 0)
+end
 
 # Testes
 
@@ -233,6 +248,7 @@ end
 handler_bind(DivisionByZero => (c)->invoke_restart(:retry_using, 10)) do
   reciprocal(0)
 end
+
 
 
 function available_restart(name)

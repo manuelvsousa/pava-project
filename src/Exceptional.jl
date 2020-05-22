@@ -1,3 +1,6 @@
+# Author1: Manuel Sousa (manuelvsousa@tecnico.ulisboa.pt)
+# Course:  Advanced Programming 19-20, Second Semester
+
 import Base.error
 
 struct DivisionByZero <: Exception end
@@ -20,22 +23,29 @@ function block(f)
     try
         f(f)
     catch e
+        println(typeof(f))
         typeof(e) == ReturnFromException && f === e.func ? e.value : throw(e)
     end
 end
 
+# Function    : return_from
+# Description : throws ReturnFromException, created to go up the call chain
+#               and alert a block() when a return_from is called
+# Arguments   : func-> function of the exit point which identifies a block().
+#               value-> value to be returned by the corresponding block
 function return_from(func, value = nothing)
     throw(ReturnFromException(func,value))
 end
 
+
+# Function    : error
+# Description : calls signal() function to spread the signal through the handlers
 function error(ex)
     try
         return signal(ex)
     catch e
-        # If I am seeing the same exception I had signaled before,
-        # means none of the handlers were able to handle it
-        # So, I will just print the message as described in project spec
-        # and throw it in the end
+        # If I see the same exception I signaled before,
+        # then none of the handlers were able to handle it
         if isa(e,typeof(ex))
             print("ERROR: ")
             print(e)
@@ -45,11 +55,17 @@ function error(ex)
     end
 end
 
-reciprocal(x) =
-  x == 0 ?
-    error(DivisionByZero()) :
-    1/x
 
+
+# Function    : handler_bind
+# Arguments   : func-> a function (or code in this context)
+#               value-> list of handlers to associated with arg func
+# Description : This function executes the func arg code and waits for an exception
+#               to be thrown by signal() (eg. ReturnFromException)
+#               This function also makes proper handling of handlers_stack operations (handlers context)
+#               appending handlers in the beggining of the execution, and poping them
+#               when the handler returns, makes a non-local transfer of control or has to terminate
+#               itself for other reasons (eg. unhandled exception)
 function handler_bind(func,handlers...)
     append!( handlers_stack, [handlers] )
     return_object = Any
@@ -64,6 +80,10 @@ function handler_bind(func,handlers...)
 end
 
 
+# Function    : find_handler
+# Arguments   : e-> exception to search in handlers_stack
+# Description : This function grabs the current handlers, and returns the proper one for the "e" exception.
+#               It assumes the handlers_stack is providing the correct handlers context.
 function find_handler(e)
     if isempty(handlers_stack)
         return nothing
@@ -75,25 +95,29 @@ function find_handler(e)
     end
 end
 
+
+# Function    : signal
+# Arguments   : e-> exception to handle
+# Description : Recursive function to propagate a signal through all the interested handlers
+#               It is responsible to update handlers_stack, keeping the correct handlers context
+#               between recursive calls, restoring the context stack before throwing back to [handler,restart]_bind
 function signal(e)
     callback = find_handler(e)
     if callback != nothing
-        # This callback can perfectly throw a return_from or invoke_restart
+        # This callback can call a return_from or invoke_restart, which will throw the corresponding Exception
         # We do not try-catch this callback here as a design choise, thus, all exceptions will be sent to
-        # the corresponding [handler,restart]_bind functions which might trigger different actions
-        # such as poping the restart/handler stacks
+        # the corresponding [handler,restart]_bind which might want to trigger very specifc actions uppon receiving them
         callback(e)
         if length(handlers_stack) > 1
             poped = pop!(handlers_stack)
-            # fds = pop!(restarts_stack)
             try
                 signal(e)
             catch ee
-                append!(handlers_stack,[poped])
-                # append!(restarts_stack,[fds])
+                append!(handlers_stack,[poped]) # restores context
                 throw(ee)
             end
         else
+            println("I would like to knwo when you are called")
             throw(e)
         end
     else
@@ -140,6 +164,7 @@ function invoke_restart(symbol, args...)
 end
 
 
+
 function available_restart(name)
     for i in restarts_stack
         if name in keys(i)
@@ -147,4 +172,157 @@ function available_restart(name)
         end
     end
     return false
+end
+
+
+
+# TESTSTST
+#
+#
+#
+#
+#
+#
+#
+
+mystery(n) =
+    1+
+    block() do outer
+        1+
+        block() do inner
+            1+
+            if n == 0
+                return_from(inner, 1)
+            elseif n == 1 return_from(outer, 1)
+            else
+                1
+            end
+        end
+    end
+
+mystery(0)
+mystery(1)
+mystery(2)
+
+reciprocal(x) =
+  x == 0 ?
+    error(DivisionByZero()) :
+    1/x
+
+try
+    handler_bind(()->reciprocal(0), DivisionByZero =>(c)->println("I saw a division by zero"))
+catch e
+
+end
+
+try
+    handler_bind(DivisionByZero =>
+                (c)->println("I saw it too")) do
+                    handler_bind(DivisionByZero =>
+                        (c)->println("I saw a division by zero")) do
+                            reciprocal(0)
+                        end
+           end
+catch e
+
+end
+
+try
+    block() do escape
+        handler_bind(DivisionByZero =>
+                        (c)->(println("I saw it too");
+                            return_from(escape, "Done"))) do
+                handler_bind(DivisionByZero =>
+                            (c)->println("I saw a division by zero")) do
+                reciprocal(0)
+            end
+        end
+    end
+catch e
+
+end
+
+try
+    block() do escape handler_bind(DivisionByZero =>
+                            (c)->println("I saw it too")) do
+                            handler_bind(DivisionByZero =>
+                                (c)->(println("I saw a division by zero"); return_from(escape, "Done"))) do
+                    reciprocal(0)
+               end
+          end
+    end
+catch e
+
+end
+
+
+reciprocal(value) =
+    restart_bind(:return_zero => ()->0,
+             :return_value => identity,
+             :retry_using => reciprocal) do
+                value == 0 ? error(DivisionByZero()) : 1/value
+    end
+
+
+
+handler_bind(DivisionByZero => (c)->invoke_restart(:return_zero)) do
+         1 + reciprocal(0) + 1 + 1 + 1
+end
+
+handler_bind(DivisionByZero => (c)->invoke_restart(:return_zero)) do
+  1 + reciprocal(0)
+end
+
+divide(x, y) = x*reciprocal(y)
+
+handler_bind(DivisionByZero => (c)->invoke_restart(:return_value, 3)) do
+  divide(2, 0)
+end
+
+# Testes
+
+
+handler_bind(DivisionByZero => (c)->invoke_restart(:return_zero)) do
+         reciprocal(0)
+end
+
+handler_bind(DivisionByZero => (c)->invoke_restart(:return_value,123)) do
+         reciprocal(0)
+end
+
+handler_bind(DivisionByZero => (c)->invoke_restart(:retry_using, 10)) do
+  reciprocal(0)
+end
+
+
+
+handler_bind(DivisionByZero =>
+        (c)-> for restart in (:return_one, :return_zero, :die_horribly)
+                if available_restart(restart)
+                    invoke_restart(restart)
+                end
+            end) do
+        reciprocal(0)
+    end
+
+
+infinity() =
+    restart_bind(:just_do_it => ()->1/0) do
+        reciprocal(0)
+    end
+
+handler_bind(DivisionByZero => (c)->invoke_restart(:return_zero)) do
+    infinity()
+end
+
+handler_bind(DivisionByZero => (c)->invoke_restart(:return_value, 1)) do
+  infinity()
+end
+
+handler_bind(DivisionByZero => (c)->invoke_restart(:retry_using, 10)) do
+  infinity()
+end
+
+handler_bind(DivisionByZero => (c)->invoke_restart(:just_do_it)) do
+  infinity()
 end

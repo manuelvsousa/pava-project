@@ -19,6 +19,12 @@ end
 handlers_stack = []
 restarts_stack = []
 
+# Function    : block
+# Arguments   : f -> function of the exit point which identifies a block(), which is ITSELF.
+# Description : Function to separate code in blocks, and to help non-local transfers of control.
+#               These transfers work by calling block with ITSELF as identifier, and uppon
+#               catching a ReturnFromException, a block can compare itself with the ReturnFromException
+#               identifier to detect the correct block to return from.
 function block(f)
     try
         f(f)
@@ -28,16 +34,17 @@ function block(f)
 end
 
 # Function    : return_from
-# Description : throws ReturnFromException, created to go up the call chain
-#               and alert a block() when a return_from is called
 # Arguments   : func -> function of the exit point which identifies a block().
 #               value -> value to be returned by the corresponding block
+# Description : throws ReturnFromException, created to go up the call chain
+#               and alert a block() when a return_from is called
 function return_from(func, value = nothing)
     throw(ReturnFromException(func,value))
 end
 
 
 # Function    : error
+# Arguments   : ex -> Exception to be signaled
 # Description : calls signal() function to spread the signal through the handlers
 function error(ex)
     try

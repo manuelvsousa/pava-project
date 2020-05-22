@@ -111,19 +111,17 @@ function signal(e)
     callback = find_handler(e)
     if callback != nothing
         # This callback can call a return_from or invoke_restart, which will throw the corresponding Exception
-        # We do not try-catch this callback here as a design choise, thus, all exceptions will be thrown to
+        # We do not try-catch this callback HERE as a design choise, thus, all exceptions will be thrown to
         # the corresponding [handler,restart]_bind which might want to trigger very specifc actions uppon receiving them
         callback(e)
-        if length(handlers_stack) > 1
-            poped = pop!(handlers_stack)
-            try
-                signal(e)
-            catch ee
-                append!(handlers_stack,[poped]) # restores context
-                throw(ee)
-            end
-        else
-            throw(e)
+    end
+    if length(handlers_stack) > 1
+        poped = pop!(handlers_stack)
+        try
+            signal(e)
+        catch ee
+            append!(handlers_stack,[poped]) # restores context
+            throw(ee)
         end
     else
         throw(e)

@@ -3,7 +3,6 @@
 
 import Base.error
 
-struct DivisionByZero <: Exception end
 struct NoRestartExistException <: Exception end
 
 struct ReturnFromException <: Exception
